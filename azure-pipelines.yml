@@ -6,7 +6,7 @@
 resources:
   containers:
   - container: nginx
-    type: ACR
+    type: ACR  
     azureSubscription: MY-Azure-connection
     resourceGroup: test-trigger
     registry: acrtriggertest1
