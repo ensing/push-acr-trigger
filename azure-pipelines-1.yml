@@ -8,3 +8,8 @@ resources:
     repository: nginx
     trigger:
       enabled: true
+pool:
+  vmImage: 'nginx'
+steps:
+- bash: echo "Hello world"
+      
