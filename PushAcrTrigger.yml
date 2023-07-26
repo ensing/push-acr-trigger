@@ -4,7 +4,7 @@ resources:
     type: ACR
     azureSubscription: MY-Azure-connection
     resourceGroup: test-trigger
-    registry: acrtriggertest
+    registry: acrtriggertest1
     repository: test
     trigger:
      enabled: true
