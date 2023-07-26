@@ -1,0 +1,10 @@
+resources:
+  containers:
+  - container: nginx
+    type: ACR  
+    azureSubscription: MY-Azure-connection
+    resourceGroup: test-trigger
+    registry: acrtriggertest
+    repository: test
+    trigger:
+     enabled: true
