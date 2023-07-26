@@ -7,4 +7,4 @@ resources:
     registry: acrtriggertest1
     repository: nginx
     trigger:
-    enabled: true
+      enabled: true
