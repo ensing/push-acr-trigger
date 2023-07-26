@@ -5,6 +5,6 @@ resources:
     azureSubscription: MY-Azure-connection
     resourceGroup: test-trigger
     registry: acrtriggertest1
-    repository: test
+    repository: nginx
     trigger:
      enabled: true
