@@ -1,3 +1,7 @@
+trigger:
+  tags:
+    include:
+    - latest
 resources:
   containers:
   - container: nginx
