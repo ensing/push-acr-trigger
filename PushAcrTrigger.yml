@@ -8,3 +8,6 @@ resources:
     repository: nginx
     trigger:
       enabled: true
+
+steps:
+- bash: echo "Hello world"
