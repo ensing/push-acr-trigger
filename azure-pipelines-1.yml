@@ -1,0 +1,29 @@
+# Starter pipeline
+# Start with a minimal pipeline that you can customize to build and deploy your code.
+# Add steps that build, run tests, deploy, and more:
+# https://aka.ms/yaml
+
+trigger:
+- none
+
+pool:
+ name: adoagentspool
+
+resources:
+  containers:
+  - container: myproject1
+    type: ACR  
+    azureSubscription: Azure-Lab-connection
+    resourceGroup: myapp-rg
+    registry: msyinjiecontainerregistry
+    repository: project
+
+steps:
+- script: echo |
+    echo $(resources.container.myproject1.type)
+    echo $(resources.container.myproject1.registry)
+    echo $(resources.container.myproject1.repository)
+    echo $(resources.container.myproject1.tag)
+    echo $(resources.container.myproject1.digest)
+    echo $(resources.container.myproject1.URI)
+    echo $(resources.container.myproject1.location)

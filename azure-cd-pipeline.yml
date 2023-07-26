@@ -1,0 +1,79 @@
+trigger:
+- none
+
+variables:
+
+  # Container registry service connection established during pipeline creation
+  imageRepository: 'project'
+  AzureSubconnection: 'Azure-Lab-connection'
+  AzureRg: 'myapp-rg'
+  containerRegistry: 'msyinjiecontainerregistry.azurecr.io'
+  acrRegistry: 'msyinjiecontainerregistry'
+  imagePullSecret: 'msyinjiecontainerregistryea6d-auth'
+  dockerRegistryServiceConnection: 'c83dd020-832a-404e-a6c4-9e924fa44da8'
+  tag: 'latest'
+
+  # Agent VM image name
+  # vmImageName: 'ubuntu-latest'
+
+resources:
+  containers:
+  - container: myacr
+    type: ACR  
+    azureSubscription: ${{variables.AzureSubconnection}}
+    resourceGroup: ${{variables.AzureRg}}
+    registry: ${{variables.acrRegistry}}
+    repository: ${{variables.imageRepository}}
+    trigger:
+     tags:
+      include:
+        - latest
+
+stages:
+- stage: Build
+  displayName: Build stage
+  jobs:
+  - job: Build
+    displayName: Build
+    pool:
+     name: adoagentspool
+     #vmImage: $(vmImageName)
+    steps:
+    - upload: manifests
+      artifact: manifests
+
+- stage: Deploy
+  displayName: Deploy stage
+  dependsOn: Build
+
+  jobs:
+  - deployment: Deploy
+    displayName: Deploy
+    pool:
+     name: adoagentspool
+     #vmImage: $(vmImageName)
+    environment: 'Project1-1460.myapp-ns'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: KubernetesManifest@0
+            displayName: Create imagePullSecret
+            inputs:
+              action: createSecret
+              secretName: $(imagePullSecret)
+              dockerRegistryEndpoint: $(dockerRegistryServiceConnection)
+
+          - task: KubernetesManifest@0
+            displayName: Deploy to Kubernetes cluster
+            inputs:
+              action: deploy
+              manifests: |
+                $(Pipeline.Workspace)/manifests/deployment.yml
+                $(Pipeline.Workspace)/manifests/service.yml
+              imagePullSecrets: |
+                $(imagePullSecret)
+              containers: |
+                $(containerRegistry)/$(imageRepository):$(tag)
+
+ 
