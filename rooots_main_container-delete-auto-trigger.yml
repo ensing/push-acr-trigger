@@ -1,0 +1,175 @@
+#按container服务自动触发完成部署
+#CIトリガーを無効にする
+trigger:
+- none
+
+variables:
+
+  #コンテナの名前
+  imageRepository: 'rooots_main_container'
+  #azure サブスクリプション
+  AzureSubconnection: 'lixing-azure-connection'
+  #azure リソース グループ
+  AzureRg: 'lixing-azure-test-group'
+  #azure コンテナー レジストリの接続にログイン サーバー
+  containerRegistry: 'lixingazureacr.azurecr.io'
+  #azuer コンテナー レジストリの名前
+  acrRegistry: 'lixingazureacr'
+  #AKS がレジストリにアクセスするための Docker 資格情報
+  imagePullSecret-at: 'lixingazureacrtest-auth' #AT环境
+  imagePullSecret-dev: 'lixingazureacrtest-auth' #开发环境
+  imagePullSecret-test: 'lixingazureacrtest-auth' #测试环境
+  #コンテナレジストリへの接続
+  dockerRegistryServiceConnection: 'lixing-test-acr-connection'
+  #仮想マシン スケール セット エージェント プールへの接続
+  vmssAgentPool: 'lixingvmssagentspool'
+  #aks NameSpace
+  aksAppNameSpace-env-at: 'lixing-env-aks.lixing-app-ns' #AT环境
+  aksAppNameSpace-env-dev: 'lixing-env-aks.lixing-app-ns' #开发环境
+  aksAppNameSpace-env-test: 'lixing-env-aks.lixing-app-ns' #测试
+  aksAppNameSpace-at: 'lixing-env-aks.lixing-app-ns' #AT环境
+  aksAppNameSpace-dev: 'lixing-env-aks.lixing-app-ns' #开发环境
+  aksAppNameSpace-test: 'lixing-env-aks.lixing-app-ns' #测试环境环境
+  roootsMainContainerDeployName: 'aks-rooots-main-container-pod'
+  #コンテナのバージョン
+  tag: 'latest'
+
+#azure pipeline リソース定義,コンテナpush是触发pipeline任务
+resources:
+  containers:
+   #コンテナの名前
+  - container: rooots_main_container
+    #コンテナー レジストリtype
+    type: ACR  
+    azureSubscription: ${{variables.AzureSubconnection}}
+    resourceGroup: ${{variables.AzureRg}}
+    registry: ${{variables.acrRegistry}}
+    repository: ${{variables.imageRepository}}
+    #トリガーのバージョンを定義する    
+    trigger:
+     tags:
+      include:
+        - latest
+#stageを定義する，デプロイメント ファイル yaml を取得する
+stages:
+- stage: Build
+  displayName: Build stage
+  jobs:
+  - job: Build
+    displayName: Build
+    #nmss 接続プール
+    pool:
+     name: $(vmssAgentPool)
+    #ファイルディレクトリ,deployマニフェストファイル
+    steps:
+    - upload: manifests
+      artifact: manifests
+      
+#DeployAtを定義する
+- stage: DeployAt
+  displayName: Deploy stage at
+  dependsOn: Build
+  jobs:
+  - deployment: Deploy
+    displayName: Deploy-at
+    pool:
+     name: $(vmssAgentPool)
+    environment: $(aksAppNameSpace-at)
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+            - task: KubernetesManifest@0
+              displayName: Create imagePullSecret
+              inputs:
+                action: createSecret
+                secretName: $(imagePullSecret-env-at)
+                dockerRegistryEndpoint: $(dockerRegistryServiceConnection)
+            - task: KubernetesManifest@0
+              displayName: Delete
+              inputs:
+                action: delete
+                arguments: $(roootsMainContainerDeployName)
+                #kubernetesServiceConnection: $(aksConnection)
+                #namespace: $(aksAppNameSpace-at)     
+            #deploy aks from AT
+            - task: KubernetesManifest@0
+              displayName: Deploy to Kubernetes cluster
+              inputs:
+                action: deploy
+                manifests: |
+                  $(Pipeline.Workspace)/manifests/deployment.yml
+                  $(Pipeline.Workspace)/manifests/service.yml
+                imagePullSecrets: |
+                  $(imagePullSecret-at)
+                containers: |
+                  $(containerRegistry)/$(imageName):$(tag)
+#DeployDevを定義する
+- stage: DeployDev
+  displayName: Deploy stage dev
+  dependsOn: Build
+
+  jobs:
+  - deployment: Deploy
+    displayName: Deploy-dev
+    pool:
+     name: $(vmssAgentPool)
+    environment: $(aksAppNameSpace-env-dev)
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          #aks デプロイ環境を構築する
+            - task: KubernetesManifest@0
+              displayName: Create imagePullSecret
+              inputs:
+                action: createSecret
+                secretName: $(imagePullSecret-dev)
+                dockerRegistryEndpoint: $(dockerRegistryServiceConnection)
+          #deploy aks from dev
+            - task: KubernetesManifest@0
+              displayName: Deploy to Kubernetes cluster
+              inputs:
+                action: deploy
+                manifests: |
+                  $(Pipeline.Workspace)/manifests/deployment.yml
+                  $(Pipeline.Workspace)/manifests/service.yml
+                imagePullSecrets: |
+                  $(imagePullSecret-dev)
+                containers: |
+                  $(containerRegistry)/$(imageName):$(tag)
+
+#DeployTestを定義する
+- stage: DeployTest
+  displayName: Deploy stage test
+  dependsOn: Build
+
+  jobs:
+  - deployment: Deploy
+    displayName: Deploy-test
+    pool:
+     name: $(vmssAgentPool)
+    environment: $(aksAppNameSpace-env-test)
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          #aks デプロイ環境を構築する
+            - task: KubernetesManifest@0
+              displayName: Create imagePullSecret
+              inputs:
+                action: createSecret
+                secretName: $(imagePullSecret-test)
+                dockerRegistryEndpoint: $(dockerRegistryServiceConnection)
+           #deploy aks from test
+            - task: KubernetesManifest@0
+              displayName: Deploy to Kubernetes cluster
+              inputs:
+                action: deploy
+                manifests: |
+                  $(Pipeline.Workspace)/manifests/deployment.yml
+                  $(Pipeline.Workspace)/manifests/service.yml
+                imagePullSecrets: |
+                  $(imagePullSecret-test)
+                containers: |
+                  $(containerRegistry)/$(imageName):$(tag)

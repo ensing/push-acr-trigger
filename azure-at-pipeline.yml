@@ -1,0 +1,157 @@
+#按环境实现手动触发任务部署AT环境
+#CIトリガーを無効にする
+trigger:
+- none
+
+variables:
+
+  #コンテナの名前
+  roootsFormContainerImageRepository: 'rooots_form_container'
+  roootsMainContainerImageRepository: 'rooots_main_container'
+  roootsMasterContainerImageRepository: 'rooots_master_container'
+  roootsPaymentContainerImageRepository: 'rooots_payment_container'
+  roootsSamePersonContainerImageRepository: 'rooots_same_person_container'
+  roootsStaffContainerImageRepository: 'rooots_staff_container'
+  roootsStatisticsContainerImageRepository: 'rooots_statistics_container'
+  #azure サブスクリプション
+  AzureSubconnection: 'lixing-azure-connection'
+  #azure リソース グループ
+  AzureRg: 'lixing-azure-test-group'
+  #azure コンテナー レジストリの接続にログイン サーバー
+  containerRegistry: 'lixingazureacr.azurecr.io'
+  #azuer コンテナー レジストリの名前
+  acrRegistry: 'lixingazureacr'
+  #AKS がレジストリにアクセスするための Docker 資格情報
+  imagePullSecret-at: 'lixingazureacrtest-auth'
+  #コンテナレジストリへの接続
+  dockerRegistryServiceConnection: 'lixing-test-acr-connection'
+  #仮想マシン スケール セット エージェント プールへの接続
+  vmssAgentPool: 'lixingvmssagentspool'
+  #aks NameSpace
+  aksAppNameSpace-env: $(aksAppNameSpace-env)
+  aksFilePath: $(aksFilePath)
+  #コンテナのバージョン
+  tag: 'latest'
+
+#stageを定義する，デプロイメント ファイル yaml を取得する
+stages:
+- stage: Build
+  displayName: Build stage
+  jobs:
+  - job: Build
+    displayName: Build
+    #nmss 接続プール
+    pool:
+     name: $(vmssAgentPool)
+    #ファイルディレクトリ,deployマニフェストファイル
+    steps:
+    - upload: manifests
+      artifact: manifests
+      
+#Deployを定義する
+- stage: DeployAt
+  displayName: Deploy stage
+  dependsOn: Build
+
+  jobs:
+  - deployment: Deploy
+    displayName: Deploy
+    pool:
+     name: $(vmssAgentPool)
+    #aks Environments资源を定義する
+    environment: $(aksAppNameSpace-env)
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          #aks デプロイ環境を構築する
+          - task: KubernetesManifest@0
+            displayName: Create imagePullSecret
+            inputs:
+              action: createSecret
+              secretName: $(imagePullSecret-at)
+              dockerRegistryEndpoint: $(dockerRegistryServiceConnection)         
+          #deploy aks from rooots_form_container 
+          - task: KubernetesManifest@0
+            displayName: Deploy rooots_form_container to Kubernetes cluster
+            inputs:
+              action: deploy
+              manifests: |
+                $(Pipeline.Workspace)/manifests/at/deployment.yml
+                $(Pipeline.Workspace)/manifests/at/service.yml
+              imagePullSecrets: |
+                $(imagePullSecret-at)
+              containers: |
+                $(containerRegistry)/$(roootsFormContainerImageRepository):$(tag)
+          #deploy aks from rooots_main_container 
+          - task: KubernetesManifest@0
+            displayName: Deploy rooots_main_container to Kubernetes cluster
+            inputs:
+              action: deploy
+              manifests: |
+                $(Pipeline.Workspace)/manifests/at/deployment.yml
+                $(Pipeline.Workspace)/manifests/at/service.yml
+              imagePullSecrets: |
+                $(imagePullSecret-at)
+              containers: |
+                $(containerRegistry)/$(roootsMainContainerImageRepository):$(tag)
+          #deploy aks from rooots_master_container 
+          - task: KubernetesManifest@0
+            displayName: Deploy rooots_master_container to Kubernetes cluster
+            inputs:
+              action: deploy
+              manifests: |
+                $(Pipeline.Workspace)/manifests/at/deployment.yml
+                $(Pipeline.Workspace)/manifests/at/service.yml
+              imagePullSecrets: |
+                $(imagePullSecret-at)
+              containers: |
+                $(containerRegistry)/$(roootsMasterContainerImageRepository):$(tag)
+          #deploy aks from rooots_payment_container 
+          - task: KubernetesManifest@0
+            displayName: Deploy rooots_payment_container to Kubernetes cluster
+            inputs:
+              action: deploy
+              manifests: |
+                $(Pipeline.Workspace)/manifests/at/deployment.yml
+                $(Pipeline.Workspace)/manifests/at/service.yml
+              imagePullSecrets: |
+                $(imagePullSecret-at)
+              containers: |
+                $(containerRegistry)/$(roootsPaymentContainerImageRepository):$(tag)
+          #deploy aks from rooots_same_person_container 
+          - task: KubernetesManifest@0
+            displayName: Deploy rooots_same_person_container to Kubernetes cluster
+            inputs:
+              action: deploy
+              manifests: |
+                $(Pipeline.Workspace)/manifests/at/deployment.yml
+                $(Pipeline.Workspace)/manifests/at/service.yml
+              imagePullSecrets: |
+                $(imagePullSecret-at)
+              containers: |
+                $(containerRegistry)/$(roootsSamePersonContainerImageRepository):$(tag)
+          #deploy aks from rooots_staff_container 
+          - task: KubernetesManifest@0
+            displayName: Deploy rooots_staff_container to Kubernetes cluster
+            inputs:
+              action: deploy
+              manifests: |
+                $(Pipeline.Workspace)/manifests/at/deployment.yml
+                $(Pipeline.Workspace)/manifests/at/service.yml
+              imagePullSecrets: |
+                $(imagePullSecret-at)
+              containers: |
+                $(containerRegistry)/$(roootsStaffContainerImageRepository):$(tag)
+          #deploy aks from rooots_statistics_container 
+          - task: KubernetesManifest@0
+            displayName: Deploy rooots_statistics_container to Kubernetes cluster
+            inputs:
+              action: deploy
+              manifests: |
+                $(Pipeline.Workspace)/manifests/at/deployment.yml
+                $(Pipeline.Workspace)/manifests/at/service.yml
+              imagePullSecrets: |
+                $(imagePullSecret-at)
+              containers: |
+                $(containerRegistry)/$(roootsStatisticsContainerImageRepository):$(tag)

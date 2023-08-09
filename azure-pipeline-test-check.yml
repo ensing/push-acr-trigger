@@ -1,0 +1,112 @@
+trigger:
+- none
+
+variables:
+
+  # Container registry service connection established during pipeline creation
+  imageName: 'nginx'
+  AzureSubconnection: 'lixing-azure-connection'
+  AzureRg: 'lixing-azure-test-group'
+  containerRegistry: 'lixingazureacr.azurecr.io'
+  acrRegistry: 'lixingazureacr'
+  imagePullSecret: 'lixingazureacrtest-auth'
+  dockerRegistryServiceConnection: 'lixing-test-acr-connection'
+  vmssAgentPool: 'lixingvmssagentspool'
+  aksAppNameSpace: 'lixing-env-aks.lixing-app-ns'
+  tag: $(resources.container.nginx.tag)
+
+  # Agent VM image name
+  # vmImageName: 'ubuntu-latest'
+
+resources:
+  containers:
+  - container: nginx
+    type: ACR  
+    azureSubscription: ${{variables.AzureSubconnection}}
+    resourceGroup: ${{variables.AzureRg}}
+    registry: ${{variables.acrRegistry}}
+    repository: ${{variables.imageName}}
+    trigger:
+     tags:
+      include:
+        - latest
+        - latest1
+   
+stages:
+- stage: Buildecho
+  displayName: Build stage
+  jobs:
+  - job: Buildecho
+    displayName: Build
+    pool:
+     name: $(vmssAgentPool)
+    steps:
+    - script: echo ${{variables.tag}}
+        echo $(resources.container.nginx.repository)
+        echo $(tag)
+        echo $(resources.container.nginx.tag)
+
+- stage: Build
+  displayName: Build stage
+  jobs:
+  - job: Build
+    displayName: Build
+    pool:
+     name: $(vmssAgentPool)
+    steps:
+    - upload: manifests
+      artifact: manifests
+
+- stage: Deploy
+  displayName: Deploy stage
+  dependsOn: Build
+
+  jobs:
+  - deployment: Deploy
+    displayName: Deploy
+    pool:
+     name: $(vmssAgentPool)
+    environment: $(aksAppNameSpace)
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - script: echo ${{variables.tag}}
+          - ${{ if eq(variables.tag, 'latest') }}:
+            - task: KubernetesManifest@0
+              displayName: Create imagePullSecret
+              inputs:
+                action: createSecret
+                secretName: $(imagePullSecret)
+                dockerRegistryEndpoint: $(dockerRegistryServiceConnection)
+            - task: KubernetesManifest@0
+              displayName: Deploy to Kubernetes cluster
+              inputs:
+                action: deploy
+                manifests: |
+                  $(Pipeline.Workspace)/manifests/deployment.yml
+                  $(Pipeline.Workspace)/manifests/service.yml
+                imagePullSecrets: |
+                  $(imagePullSecret)
+                containers: |
+                  $(containerRegistry)/$(imageName):$(tag)
+          - ${{ elseif eq(variables.tag, 'latest1') }}:
+            - task: KubernetesManifest@0
+              displayName: Create imagePullSecret
+              inputs:
+                action: createSecret
+                secretName: $(imagePullSecret)
+                dockerRegistryEndpoint: $(dockerRegistryServiceConnection)
+            - task: KubernetesManifest@0
+              displayName: Deploy to Kubernetes cluster
+              inputs:
+                action: deploy
+                manifests: |
+                  $(Pipeline.Workspace)/manifests/deployment1.yml
+                  $(Pipeline.Workspace)/manifests/service1.yml
+                imagePullSecrets: |
+                  $(imagePullSecret)
+                containers: |
+                  $(containerRegistry)/$(imageName):$(tag)
+          - ${{ else }}:
+            - script: echo "the value is not adaptum or contoso"
